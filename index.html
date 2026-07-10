@@ -398,7 +398,7 @@ function renderTasks(){
       <div class="act">
         <span class="st ${t.status}">${ST_LABEL[t.status]}</span>
         <span style="color:var(--muted);font-size:13px">เปลี่ยนสถานะ:</span>
-        <select onchange="setStatus(${t.id},this.value)">
+        <select onchange="setStatus('${t.id}',this.value)">
           <option value="wait" ${t.status==='wait'?'selected':''}>รอดำเนินการ</option>
           <option value="fix" ${t.status==='fix'?'selected':''}>กำลังซ่อม</option>
           <option value="done" ${t.status==='done'?'selected':''}>เสร็จแล้ว</option>
@@ -407,7 +407,7 @@ function renderTasks(){
     </div>`).join('') : '<div class="empty">ไม่มีงานในหมวดนี้</div>';
 }
 function setStatus(id,st){
-  const t=tasks.find(x=>x.id===id); if(!t)return;
+  const t=tasks.find(x=>String(x.id)===String(id)); if(!t)return;
   t.status=st; if(CONFIG.mode==='live') apiCall('updateStatus',{id,status:st});
   if(st==='done') toast('✅ ปิดงานเรียบร้อย: '+t.room+' '+t.item);
   renderTasks();renderDash();refreshBadge();
@@ -426,13 +426,13 @@ function renderHist(){
 function renderNotifs(){
   const l=$('#nlist');
   l.innerHTML=notifs.length? notifs.slice().reverse().map(n=>`
-    <div class="nitem ${n.unread?'unread':''}" onclick="openNotif(${n.id})">
+    <div class="nitem ${n.unread?'unread':''}" onclick="openNotif('${n.id}')">
       <div class="ic">${n.icon}</div>
       <div class="tx"><div class="tt">${n.title}</div><div class="dd">${n.detail} • ${n.date}</div></div>
     </div>`).join('') : '<div class="empty">ไม่มีการแจ้งเตือน</div>';
 }
 function openNotif(id){
-  const n=notifs.find(x=>x.id===id); if(n){n.unread=false;}
+  const n=notifs.find(x=>String(x.id)===String(id)); if(n){n.unread=false;}
   $('#ndrop').classList.remove('show');
   if(n&&n.taskId){switchView('tasks');taskFilter='all';$$('[data-f]').forEach(b=>b.classList.toggle('active',b.dataset.f==='all'));renderTasks();}
   refreshBadge();renderNotifs();
