@@ -101,6 +101,12 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--primary)
 .pill.normal{background:#eef0f2;color:var(--muted)}
 .task .act{display:flex;gap:8px;margin-top:11px;align-items:center;flex-wrap:wrap}
 .task select{width:auto;padding:6px 10px;font-size:13px}
+.sbtn{padding:7px 13px;border-radius:8px;border:1.5px solid var(--line);background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);font-family:inherit;transition:.12s}
+.sbtn:hover{border-color:var(--muted)}
+.sbtn.active{color:#fff;border-color:transparent}
+.sbtn.active.wait{background:var(--danger)}
+.sbtn.active.fix{background:var(--warn)}
+.sbtn.active.done{background:var(--ok)}
 .st{font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:6px}
 .st.wait{background:var(--danger-light);color:var(--danger)}
 .st.fix{background:#fff3e0;color:#c2410c}.st.done{background:#eafaf2;color:var(--ok)}
@@ -275,7 +281,6 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--primary)
 <script>
 /* ===================================================================
    โหมดการทำงาน: 'demo' = ข้อมูลตัวอย่างในเครื่อง | 'live' = ต่อ Apps Script จริง
-   เมื่อพร้อมใช้จริง: ตั้ง mode:'live' และใส่ apiUrl ที่ได้จากการ deploy Apps Script
 =================================================================== */
 const CONFIG = { mode:'live', apiUrl:'https://script.google.com/macros/s/AKfycbyHy_52LzJQrgUgW3dFxLch6ZbtSUXi3QXkHxKPINnfouEPEos-zf0G8af7sbCTXR4Giw/exec' };
 
@@ -319,9 +324,8 @@ let history = [
 ];
 let fiveScores = {'อนุบาล':4.5,'ป.1':4.0,'ป.2':3.4,'ป.3':4.6,'ป.4':4.2,'ป.5':3.8,'ป.6':4.4};
 let nextId = 100;
-let photos = [];  // รูปแนบ (data URL)
+let photos = [];
 
-/* ---------- utils ---------- */
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const URG_LABEL={urgent:'ด่วนมาก',high:'ด่วน',normal:'ปกติ'};
 const ST_LABEL={wait:'รอดำเนินการ',fix:'กำลังซ่อม',done:'เสร็จแล้ว'};
@@ -336,7 +340,6 @@ function refreshBadge(){
   const d=$('#taskDot'); d.textContent=open; d.style.display=open?'inline-block':'none';
 }
 
-/* ---------- dashboard ---------- */
 function renderDash(){
   const risk=tasks.filter(t=>t.cat==='ความปลอดภัย'&&t.status!=='done').length;
   const broke=tasks.filter(t=>t.cat==='วัสดุ/อุปกรณ์'&&t.status!=='done').length;
@@ -362,7 +365,6 @@ function renderDash(){
     <div class="track"><div class="fill ${cls}" style="width:${v/5*100}%"></div></div></div>`;}).join('');
   renderRepairBars();
 }
-/* กราฟแท่ง: รายการที่แจ้งซ่อมมาก/น้อย ตามปีการศึกษา/ภาคเรียน */
 function buildYearOptions(){
   const years=[...new Set(tasks.map(t=>t.year))].sort().reverse();
   $('#dYear').innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
@@ -381,7 +383,6 @@ function renderRepairBars(){
     <div class="track"><div class="fill rank" style="width:${v/max*100}%"></div></div></div>`).join('');
 }
 
-/* ---------- tasks ---------- */
 let taskFilter='all';
 function renderTasks(){
   const list=$('#taskList');
@@ -397,22 +398,19 @@ function renderTasks(){
       </div>
       <div class="act">
         <span class="st ${t.status}">${ST_LABEL[t.status]}</span>
-        <span style="color:var(--muted);font-size:13px">เปลี่ยนสถานะ:</span>
-        <select onchange="setStatus('${t.id}',this.value)">
-          <option value="wait" ${t.status==='wait'?'selected':''}>รอดำเนินการ</option>
-          <option value="fix" ${t.status==='fix'?'selected':''}>กำลังซ่อม</option>
-          <option value="done" ${t.status==='done'?'selected':''}>เสร็จแล้ว</option>
-        </select>
+        <span style="color:var(--muted);font-size:13px">→ กดเปลี่ยน:</span>
+        <button class="sbtn wait ${t.status==='wait'?'active':''}" onclick="setStatus('${t.id}','wait')">รอดำเนินการ</button>
+        <button class="sbtn fix ${t.status==='fix'?'active':''}" onclick="setStatus('${t.id}','fix')">กำลังซ่อม</button>
+        <button class="sbtn done ${t.status==='done'?'active':''}" onclick="setStatus('${t.id}','done')">เสร็จแล้ว</button>
       </div>
     </div>`).join('') : '<div class="empty">ไม่มีงานในหมวดนี้</div>';
 }
 function setStatus(id,st){
   const t=tasks.find(x=>String(x.id)===String(id)); if(!t)return;
   t.status=st; if(CONFIG.mode==='live') apiCall('updateStatus',{id,status:st});
-  if(st==='done') toast('✅ ปิดงานเรียบร้อย: '+t.room+' '+t.item);
+  toast(st==='done'?('✅ ปิดงานแล้ว: '+t.room+' '+t.item):('💾 บันทึกสถานะ: '+ST_LABEL[st]));
   renderTasks();renderDash();refreshBadge();
 }
-/* ---------- history (filter by type) ---------- */
 let histFilter='all';
 function renderHist(){
   const rows=history.filter(h=>histFilter==='all'||h.cat===histFilter);
@@ -422,7 +420,6 @@ function renderHist(){
     <td style="padding:10px">${h.result}</td><td style="padding:10px">${h.by}</td></tr>`).join('')
     : '<tr><td colspan="6"><div class="empty">ไม่มีประวัติในประเภทนี้</div></td></tr>';
 }
-/* ---------- notif ---------- */
 function renderNotifs(){
   const l=$('#nlist');
   l.innerHTML=notifs.length? notifs.slice().reverse().map(n=>`
@@ -437,7 +434,6 @@ function openNotif(id){
   if(n&&n.taskId){switchView('tasks');taskFilter='all';$$('[data-f]').forEach(b=>b.classList.toggle('active',b.dataset.f==='all'));renderTasks();}
   refreshBadge();renderNotifs();
 }
-/* ---------- form build ---------- */
 function buildForm(){
   $('#fYear').value=CUR_YEAR;
   $('#fLevel').innerHTML='<option value="">— เลือก —</option>'+LEVELS.map(l=>`<option>${l}</option>`).join('');
@@ -463,7 +459,6 @@ function setStar(i,s){
   starVals[i]=s;
   $$(`.stars[data-i="${i}"] .star`).forEach(el=>el.classList.toggle('on',+el.dataset.s<=s));
 }
-/* ---------- photo ---------- */
 function handlePhotos(files){
   [...files].forEach(f=>{
     const r=new FileReader();
@@ -477,7 +472,6 @@ function renderPhotos(){
 }
 function rmPhoto(i){photos.splice(i,1);renderPhotos();}
 
-/* ---------- สร้างรูปสรุปผล (PNG) ---------- */
 async function makeSummaryImage(rec){
   await (document.fonts?document.fonts.ready:Promise.resolve());
   const W=720, pad=32, lh=30;
@@ -488,23 +482,19 @@ async function makeSummaryImage(rec){
   const cv=$('#sumCanvas'); cv.width=W; cv.height=H;
   const c=cv.getContext('2d');
   c.fillStyle='#ffffff';c.fillRect(0,0,W,H);
-  // header
   c.fillStyle='#1e6f5c';c.fillRect(0,0,W,96);
   c.fillStyle='#fff';c.font='700 24px Sarabun, sans-serif';
   c.fillText('แบบสำรวจจุดเสี่ยงภายในห้องเรียน',pad,42);
   c.font='400 16px Sarabun, sans-serif';c.fillStyle='#d8efe7';
   c.fillText('โรงเรียนจารุวัฒนานุกูล • งานบริหารทั่วไป',pad,72);
-  // status badge
   const ok=findings.length===0;
   c.fillStyle=ok?'#1e9e6a':'#e23e57';
   c.fillRect(W-pad-150,28,150,40);
   c.fillStyle='#fff';c.font='700 18px Sarabun, sans-serif';c.textAlign='center';
   c.fillText(ok?'ผ่านทุกรายการ':'พบ '+findings.length+' จุด',W-pad-75,54);c.textAlign='left';
-  // info
   let y=140;c.fillStyle='#1f2937';c.font='400 17px Sarabun, sans-serif';
   const info=[['ห้อง',rec.room],['ปีการศึกษา/ภาคเรียน',rec.year+' / '+rec.term],['ผู้สำรวจ',rec.by],['วันที่',rec.date],['ความเร่งด่วน',URG_LABEL[rec.urg]]];
   info.forEach(([k,v])=>{c.fillStyle='#6b7280';c.fillText(k,pad,y);c.fillStyle='#1f2937';c.font='600 17px Sarabun, sans-serif';c.fillText(': '+v,pad+200,y);c.font='400 17px Sarabun, sans-serif';y+=lh;});
-  // findings
   y+=6;c.fillStyle='#155446';c.font='700 18px Sarabun, sans-serif';c.fillText('ผลการสำรวจ',pad,y);y+=lh;
   c.font='400 16px Sarabun, sans-serif';
   if(ok){c.fillStyle='#1e9e6a';c.fillText('✓ ทุกรายการปลอดภัย/ปกติ ไม่พบจุดเสี่ยง',pad,y);y+=lh;}
@@ -512,20 +502,16 @@ async function makeSummaryImage(rec){
     let line=`${f.item} (${CAT_LABEL[f.cat]||f.cat})`+(f.detail?' — '+f.detail:'');
     if(line.length>70)line=line.slice(0,68)+'…';
     c.fillText(line,pad+18,y);y+=lh;});
-  // photos
   if(rec.photoImgs.length){y+=8;c.fillStyle='#6b7280';c.font='400 15px Sarabun, sans-serif';c.fillText('รูปประกอบ:',pad,y);y+=12;
     let x=pad;rec.photoImgs.slice(0,4).forEach(img=>{try{c.drawImage(img,x,y,130,120);}catch(e){}x+=142;});y+=130;}
-  // footer
   c.fillStyle='#9ca3af';c.font='400 13px Sarabun, sans-serif';
   c.fillText('สร้างโดยระบบดูแลห้องเรียนออนไลน์ • '+now(),pad,H-20);
-  // download
   const a=document.createElement('a');
   a.download=`สรุปสำรวจ_${rec.room.replace(/\//g,'-')}_${rec.date.replace(/[: ]/g,'-')}.png`;
   a.href=cv.toDataURL('image/png');a.click();
 }
 function loadImg(src){return new Promise(res=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>res(null);i.src=src;});}
 
-/* ---------- submit ---------- */
 async function submitForm(){
   const year=$('#fYear').value.trim(), term=$('#fTerm').value;
   const level=$('#fLevel').value, room=$('#fRoom').value, by=$('#fBy').value.trim();
@@ -537,7 +523,6 @@ async function submitForm(){
   let lowS=[];Object.keys(starVals).forEach(i=>{if(starVals[i]<=2)lowS.push({cat:'5ส',item:FIVE_S[i].k+' (5ส)',score:starVals[i]});});
   const dt=now();
   const allFindings=[...problems,...lowS].map(p=>({cat:p.cat,item:p.item,detail:p.note||(p.score?`คะแนน ${p.score}`:'')}));
-  // tasks + notifs
   [...problems,...lowS].forEach(p=>{
     const id=++nextId;
     const assignee = p.item.match(/ไฟ|ปลั๊ก|สวิตช์|หลอด|แอร์|ปรับอากาศ|พัดลม|ทีวี|โปรเจค/)?'ช่างไฟฟ้า':
@@ -548,7 +533,6 @@ async function submitForm(){
       detail:p.note||note||'พบปัญหาจากการสำรวจ',date:dt,unread:true,taskId:id});
     if(CONFIG.mode==='live') apiCall('addTask',{year,term,room:roomName,cat:p.cat,item:p.item,urg,by,date:dt,assignee});
   });
-  // history แยกตามประเภทเพื่อให้กรองได้
   const byCat={};[...problems,...lowS].forEach(p=>{byCat[p.cat]=(byCat[p.cat]||0)+1;});
   if(Object.keys(byCat).length){
     Object.entries(byCat).forEach(([cat,n])=>history.unshift({date:dt,year,term,room:roomName,cat,
@@ -559,7 +543,6 @@ async function submitForm(){
   if(CONFIG.mode==='live') apiCall('addInspection',{year,term,room:roomName,by,date:dt,result:(allFindings.length?`พบ ${allFindings.length} จุด`:'ผ่าน'),photos});
 
   toast(allFindings.length?`📤 ส่งแล้ว • แจ้งเตือน ${allFindings.length} จุด • กำลังสร้างรูปสรุป…`:'📤 ส่งแล้ว — ผ่านทุกรายการ 🎉 กำลังสร้างรูปสรุป…');
-  // สร้างรูปสรุป
   const photoImgs=[];for(const p of photos.slice(0,4)){const im=await loadImg(p);if(im)photoImgs.push(im);}
   await makeSummaryImage({room:roomName,year,term,by,date:dt,urg,findings:allFindings,photoImgs});
 
@@ -576,7 +559,6 @@ function resetForm(){
   starVals={};$$('.star').forEach(s=>s.classList.remove('on'));
   photos=[];renderPhotos();
 }
-/* ---------- simulate ---------- */
 function simulate(){
   const samples=[
     {room:'ป.4/3',cat:'ความปลอดภัย',item:'ปลั๊กไฟ / สายไฟ',detail:'ปลั๊กหลวม เสียบแล้วมีประกายไฟ',urg:'urgent',by:'ครูสุดา',icon:'⚡',assignee:'ช่างไฟฟ้า'},
@@ -592,13 +574,11 @@ function simulate(){
   const bell=$('#bell');bell.animate([{transform:'rotate(0)'},{transform:'rotate(-18deg)'},{transform:'rotate(15deg)'},{transform:'rotate(-10deg)'},{transform:'rotate(0)'}],{duration:500});
   toast(`🔔 แจ้งเตือนใหม่: ${s.room} — ${s.item}`);
 }
-/* ---------- nav ---------- */
 function switchView(v){
   $$('.tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v));
   $$('.view').forEach(s=>s.classList.toggle('active',s.id==='v-'+v));
   window.scrollTo({top:0,behavior:'smooth'});
 }
-/* ---------- live API ---------- */
 async function apiCall(action,data){
   try{const r=await fetch(CONFIG.apiUrl,{method:'POST',body:JSON.stringify({action,...data})});return await r.json();}
   catch(e){console.warn('API error',e);}
@@ -609,7 +589,6 @@ async function loadLive(){
 }
 function startPolling(){ if(CONFIG.mode!=='live')return; setInterval(async()=>{await loadLive();renderDash();renderTasks();renderNotifs();refreshBadge();},15000); }
 
-/* ---------- events ---------- */
 $$('.tab').forEach(t=>t.onclick=()=>switchView(t.dataset.v));
 $$('.cat').forEach(c=>c.onclick=()=>{$$('.cat').forEach(x=>x.classList.remove('active'));c.classList.add('active');
   $$('.cat-pane').forEach(p=>p.classList.remove('active'));$('#pane-'+c.dataset.c).classList.add('active');});
@@ -625,7 +604,6 @@ $('#submitBtn').onclick=submitForm;
 $('#resetBtn').onclick=()=>{resetForm();toast('ล้างฟอร์มแล้ว');};
 $('#simBtn').onclick=simulate;
 
-/* ---------- init ---------- */
 if(CONFIG.mode==='live'){$('#demoBanner').style.display='none';loadLive().then(init);startPolling();}else{init();}
 function init(){buildForm();buildYearOptions();renderDash();renderTasks();renderHist();renderNotifs();refreshBadge();renderPhotos();}
 </script>
